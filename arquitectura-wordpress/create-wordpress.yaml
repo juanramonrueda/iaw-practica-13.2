@@ -1,0 +1,149 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  Esta plantilla sirve para crear la infraestructura de WordPress de la práctica 9 de IAW.
+  Primero se establecerán los grupos de seguridad para cada instancia con sus respectivos puertos de entrada.
+  Después se establecerá una dirección IP elástica para la instancia que hará de balanceador de carga y se procederá
+  con la creación de las instancias para WordPress en tres niveles, un balanceador de carga, dos frontend, un NFS Server y
+  un backend.
+ 
+
+#---------------------------------------------------------------------------------------
+Resources:
+  
+  # Grupos de seguridad
+  SgBalancer:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: SG_Balancer
+      GroupDescription: Grupo de seguridad para balanceador de carga
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  SgFrontendBalancer:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: SG_Frontend-Balancer
+      GroupDescription: Grupo de seguridad para los frontales con balanceador de carga
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  SgBackend:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupId: tcp
+      GroupName: SG_Backend
+      GroupDescription: Grupo de seguridad para las bases de datos
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0
+
+  SgNFS:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: SG_NFS
+      GroupDescription: Grupo de seguridad para el servidor NFS
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          CidrIp: 0.0.0.0/0
+
+#---------------------------------------------------------------------------------------
+# Creación de IP elástica para la instancia que hará de balanceador de carga
+
+  BalancerEIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref BalancerInstance
+
+
+#---------------------------------------------------------------------------------------
+# Instancias
+
+  BalancerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0b93ce03dcbcb10f6
+      InstanceType: t2.small
+      SecurityGroups: !Ref SG_Balancer
+      KeyName: vockey
+      Tags:
+        - Key: Name
+          Value: iaw-practica-09-balancer
+
+  Frontend01Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0b93ce03dcbcb10f6
+      InstanceType: t2.small
+      SecurityGroups: !Ref SG_Frontend-Balancer
+      KeyName: vockey
+      Tags:
+        - Key: Name
+          Value: iaw-practica-09-frontend-01
+
+  Frontend02Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0b93ce03dcbcb10f6
+      InstanceType: t2.small
+      SecurityGroups: !Ref SG_Frontend-Balancer
+      KeyName: vockey
+      Tags:
+        - Key: Name
+          Value: iaw-practica-09-frontend-02
+
+  BackendInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0b93ce03dcbcb10f6
+      InstanceType: t2.small
+      SecurityGroups: !Ref SG_Backend
+      KeyName: vockey
+      Tags:
+        - Key: Name
+          Value: iaw-practica-09-backend
+
+  NfsServerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0b93ce03dcbcb10f6
+      InstanceType: t2.small
+      SecurityGroups: !Ref SG_NFS
+      KeyName: vockey
+      Tags:
+        - Key: Name
+          Value: iaw-practica-09-nfs-server
