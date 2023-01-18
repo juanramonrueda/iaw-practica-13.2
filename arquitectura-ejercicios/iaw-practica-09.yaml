@@ -1,0 +1,313 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  Esta plantilla sirve para crear la infraestructura de WordPress de la practica 9 de IAW.
+  Primero se estableceran los grupos de seguridad para cada instancia con sus respectivos puertos de entrada.
+  Despues se establecera una direccion IP elastica para la instancia que hara de balanceador de carga y se procedera
+  con la creacion de las instancias para WordPress en tres niveles, un balanceador de carga, dos frontend, un NFS Server y un backend.
+
+
+Parameters:
+  IdAmi:
+    Type: String
+    Default: ami-06878d265978313ca
+
+  Ram4Gb:
+    Type: String
+    Default: t2.medium
+
+  Ram8Gb:
+    Type: String
+    Default: t2.large
+
+  BalancerInstanceName:
+    Type: String
+    Default: iaw-practica-09-balancer
+
+  Frontend01InstanceName:
+    Type: String
+    Default: iaw-practica-09-frontend-01
+
+  Frontend02InstanceName:
+    Type: String
+    Default: iaw-practica-09-frontend-02
+
+  BackendInstanceName:
+    Type: String
+    Default: iaw-practica-09-backend
+
+  NfsInstanceName:
+    Type: String
+    Default: iaw-practica-09-nfs-server
+
+  KeyFileName:
+    Type: String
+    Default: vockey
+
+  BalancerSecurityGroupName:
+    Type: String
+    Default: SG_Balancer_09
+
+  BalancerSecurityGroupDescription:
+    Type: String
+    Default: Grupo de seguridad para balanceador de carga
+
+  FrontendSecurityGroupName:
+    Type: String
+    Default: SG_Frontend_Balancer_09
+
+  FrontendSecurityGroupDescription:
+    Type: String
+    Default: Grupo de seguridad para los frontales con balanceador de carga
+
+  BackendSecurityGroupName:
+    Type: String
+    Default: SG_Backend_09
+
+  BackendSecurityGroupDescription:
+    Type: String
+    Default: Grupo de seguridad para las bases de datos
+
+  NfsSecurityGroupName:
+    Type: String
+    Default: SG_NFS_09
+
+  NfsSecurityGroupDescription:
+    Type: String
+    Default: Grupo de seguridad para el servidor NFS
+
+  SgIpProtocol:
+    Type: String
+    Default: tcp
+  
+  SgCidrIp:
+    Type: String
+    Default: 0.0.0.0/0
+
+  SshPort:
+    Type: String
+    Default: 22
+
+  HttpsPort:
+    Type: String
+    Default: 443
+
+  HttpPort:
+    Type: String
+    Default: 80
+
+  SqlPort:
+    Type: String
+    Default: 3306
+
+  NfsPort:
+    Type: String
+    Default: 2049
+
+
+Resources:
+  BalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName:
+        Ref: BalancerSecurityGroupName
+      GroupDescription:
+        Ref: BalancerSecurityGroupDescription
+      SecurityGroupIngress:
+        - IpProtocol:
+            Ref: SgIpProtocol
+          FromPort:
+            Ref: SshPort
+          ToPort:
+            Ref: SshPort
+          CidrIp:
+            Ref: SgCidrIp
+
+        - IpProtocol:
+            Ref: SgIpProtocol
+          FromPort:
+            Ref: HttpsPort
+          ToPort:
+            Ref: HttpsPort
+          CidrIp:
+            Ref: SgCidrIp
+
+        - IpProtocol:
+            Ref: SgIpProtocol
+          FromPort:
+            Ref: HttpPort
+          ToPort:
+            Ref: HttpPort
+          CidrIp:
+            Ref: SgCidrIp
+
+
+  FrontendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName:
+        Ref: FrontendSecurityGroupName
+      GroupDescription:
+        Ref: FrontendSecurityGroupDescription
+      SecurityGroupIngress:
+        - IpProtocol:
+            Ref: SgIpProtocol
+          FromPort:
+            Ref: SshPort
+          ToPort:
+            Ref: SshPort
+          CidrIp:
+            Ref: SgCidrIp
+
+        - IpProtocol:
+            Ref: SgIpProtocol
+          FromPort:
+            Ref: HttpPort
+          ToPort:
+            Ref: HttpPort
+          CidrIp:
+            Ref: SgCidrIp
+
+
+  BackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName:
+        Ref: BackendSecurityGroupName
+      GroupDescription:
+        Ref: BackendSecurityGroupDescription
+      SecurityGroupIngress:
+        - IpProtocol:
+            Ref: SgIpProtocol
+          FromPort:
+            Ref: SshPort
+          ToPort:
+            Ref: SshPort
+          CidrIp:
+            Ref: SgCidrIp
+
+        - IpProtocol:
+            Ref: SgIpProtocol
+          FromPort:
+            Ref: SqlPort
+          ToPort:
+            Ref: SqlPort
+          CidrIp:
+            Ref: SgCidrIp
+
+
+  NfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName:
+        Ref: NfsSecurityGroupName
+      GroupDescription:
+        Ref: NfsSecurityGroupDescription
+      SecurityGroupIngress:
+        - IpProtocol:
+            Ref: SgIpProtocol
+          FromPort:
+            Ref: SshPort
+          ToPort:
+            Ref: SshPort
+          CidrIp:
+            Ref: SgCidrIp
+
+        - IpProtocol:
+            Ref: SgIpProtocol
+          FromPort:
+            Ref: NfsPort
+          ToPort:
+            Ref: NfsPort
+          CidrIp:
+            Ref: SgCidrIp
+
+
+  BalancerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Ref: IdAmi
+      InstanceType:
+        Ref: Ram4Gb
+      SecurityGroups:
+        - !Ref BalancerSecurityGroup
+      KeyName:
+        Ref: KeyFileName
+      Tags:
+        - Key: Name
+          Value:
+            Ref: BalancerInstanceName
+
+
+  Frontend01Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Ref: IdAmi
+      InstanceType:
+        Ref: Ram4Gb
+      SecurityGroups:
+        - !Ref FrontendSecurityGroup
+      KeyName:
+        Ref: KeyFileName
+      Tags:
+        - Key: Name
+          Value:
+            Ref: Frontend01InstanceName
+
+
+  Frontend02Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Ref: IdAmi
+      InstanceType:
+        Ref: Ram4Gb
+      SecurityGroups:
+        - !Ref FrontendSecurityGroup
+      KeyName:
+        Ref: KeyFileName
+      Tags:
+        - Key: Name
+          Value:
+            Ref: Frontend02InstanceName
+
+
+  BackendInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Ref: IdAmi
+      InstanceType:
+        Ref: Ram8Gb
+      SecurityGroups:
+        - !Ref BackendSecurityGroup
+      KeyName:
+        Ref: KeyFileName
+      Tags:
+        - Key: Name
+          Value:
+            Ref: BackendInstanceName
+
+
+  NfsInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:
+        Ref: IdAmi
+      InstanceType:
+        Ref: Ram8Gb
+      SecurityGroups:
+        - !Ref NfsSecurityGroup
+      KeyName:
+        Ref: KeyFileName
+      Tags:
+        - Key: Name
+          Value:
+            Ref: NfsInstanceName
+
+
+  BalancerElasticIp:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref BalancerInstance
